@@ -1,4 +1,5 @@
 import array as arr
+import math
 import matplotlib.pyplot as plt
 import numpy as np
 import datetime
@@ -7,10 +8,9 @@ import requests
 import io
 import pandas as pd
 from scipy.signal import savgol_filter
+from scipy.ndimage.filters import uniform_filter1d
 
 # GET CURRENT DATA FROM CSSEGIS GitHub Source
-#baseURL = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/" 
-#baseURL = "https://github.com/Omaroid/Covid-19-API/blob/master/data.json"
 baseURL = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv"
 deaths_= requests.get(baseURL).content
 df_deaths=pd.read_csv(io.StringIO(deaths_.decode('utf-8')))
@@ -44,7 +44,7 @@ latest_deaths = acc_deaths[len(acc_deaths)-1]; #most recent death statistic
 #  - sorts infected populatino into asymptomatic, mild/moderate, and severe. Assumes severe need hospitilization.
 
 pop = 330414717
-sus = 0.20
+sus = 0.15
 
 # THIS IS A VERY IMPORTANT PARAMETER - HOW MANY ACTUAL CASES ARE THERE FOR EVERYONE CURRENTLY DYING.
 # will differ from actual cases reported, if there is exponential growth and/or if testing is inefficient.
@@ -68,10 +68,10 @@ I3 = arr.array('f', [I[0] * 0.05])
 
 # epidemilogical constants
 R0 = 2.2
-gamma = 1 / 12
+gamma = 1 / 14
 beta = R0 * gamma
 
-CMR = 0.01
+CMR = 0.009
 CMR_max = 0.05
 rec_CMR = arr.array('f', [CMR])
 
@@ -112,7 +112,9 @@ for i in range (1, no_days):
         pi.append( 1.0 ) 
 
 # smooth since it requires some time
-pi_sm = savgol_filter(pi, 101, 2)
+#pi_sm = savgol_filter(pi, 7, 2)
+pi_sm = uniform_filter1d(pi, size=5)
+
 
 # Run the simulation
 for i in range (1, no_days):
@@ -132,8 +134,10 @@ for i in range (1, no_days):
     if (beds_left[i] < 0):
         CMR_d = CMR_max
     else:
-        CMR_d = (( (CMR_max - CMR) * (1 - beds_left[i] / h_beds) ) ** 2) / 0.025 + CMR;
-
+        #CMR_d = (( (CMR_max - CMR) * (1 - beds_left[i] / h_beds) ) ** 2) / 0.025 + CMR;
+        CMR_d = (CMR_max - CMR) / (1 + math.exp(-5 * (0.5-beds_left[i]/h_beds))) + CMR;
+        
+        #=1/(1+EXP(-5*(I2-0)))*($E$3-$E$2)+$E$2
     rec_CMR.append(CMR_d)
 
     R.append( R[i - 1] + (1 - CMR_d) * gamma * I[i - 1] )
@@ -218,7 +222,7 @@ ax2.set_xlabel('Days from Today')
 ax2.set_ylabel('New Deaths per Day')
 ax2.legend()
 
-ax3.plot(time, np.array(pi) * R0)
+ax3.plot(time, np.array(pi_sm) * R0)
 ax3.set_xlim(0,30)
 ax3.set_xlabel('Days from Today')
 ax3.set_ylim(0, 2.2)
