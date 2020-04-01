@@ -82,7 +82,7 @@ beds_left[0] = h_beds
 # suppression efficacy
 lv1 = 0
 lv2 = 7
-lv3 = 40
+lv3 = 14
 
 r1 = 0.85
 r2 = 0.60
